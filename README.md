@@ -1,1 +1,1 @@
-# image-processing
+# Image Optimizer
