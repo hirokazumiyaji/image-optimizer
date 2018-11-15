@@ -1,17 +1,15 @@
 const { Storage } = require('@google-cloud/storage')
-const gm = require('gm').subClass({ imageMagick: true })
+const sharp = require('sharp')
 
-const options = '!'
-
-exports.image_optimizer = (req, res) => {
+exports.image_optimizer = async (req, res) => {
   const projectId = process.env.GCP_PROJECT
   const bucket = process.env.BUCKET_NAME
 
   const storage = new Storage({ projectId: projectId })
 
-  const quality = req.query.q
-  const width = req.query.w
-  const height = req.query.h
+  const quality = parseInt(req.query.q)
+  const width = parseInt(req.query.w)
+  const height = parseInt(req.query.h)
   const accept = req.get('accept')
 
   if (!accept.includes('image')) {
@@ -21,24 +19,62 @@ exports.image_optimizer = (req, res) => {
 
   const file = storage.bucket(bucket).file(req.path.substring(1))
 
-  let stream = file.createReadStream()
+  const metadata = await file.getMetadata()
+  const contentType = metadata[0].contentType
 
-  stream.on('error', err => {
+  let inStream = file.createReadStream()
+
+  inStream.on('error', err => {
     console.error(err)
     res.status(err.code).send({ message: err })
   })
 
-  let resStream = gm(stream)
+  let outStream = await sharp(inStream)
   if (width && height) {
-    resStream = resStream.resize(width, height, options)
+    outStream = outStream
+      .resize(width, height)
+      .max()
+      .withoutEnlargement()
   }
-  if (quality) {
-    resStream = resStream.quality(quality)
-  }
-  if (accept.includes('image/webp')) {
-    resStream = resStream.stream('webp')
-  } else {
-    resStream = resStream.stream()
-  }
-  resStream.pipe(res)
+  const buffer = await outStream.toBuffer()
+  res.set('Content-Type', contentType)
+  //let buffer = null
+  //if (accept.includes('image/webp')) {
+  //  if (quality) {
+  //    outStream = outStream.webp({ quality: quality })
+  //  } else {
+  //    outStream = outStream.webp()
+  //  }
+  //  try {
+  //    buffer = await outStream.toBuffer()
+  //  } catch (e) {
+  //    console.group('toBuffer webp')
+  //    console.log(e)
+  //    console.groupEnd()
+  //    throw e
+  //  }
+  //  res.set('Content-Type', 'image/webp')
+  //} else {
+  //  try {
+  //    buffer = await outStream.toBuffer()
+  //  } catch (e) {
+  //    console.group('toBuffer webp')
+  //    console.log(e)
+  //    console.groupEnd()
+  //    throw e
+  //  }
+  //  if (quality) {
+  //    buffer = await imagemin.buffer(buffer, {
+  //      plugins: [
+  //        imageminMozjpeg({ quality: quality }),
+  //        imageminPngquant({ quality: quality })
+  //      ]
+  //    })
+  //  }
+  //  res.set('Content-Type', contentType)
+  //}
+
+  res.set('Vary', 'Accept')
+  res.set('Cache-Control', 'public, max-age=86400')
+  res.send(buffer)
 }
