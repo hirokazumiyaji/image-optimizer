@@ -8,21 +8,21 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "deploy:staging": "REGION=asia-northeast1 PROJECT_ID=lynomi-staging BUCKET_NAME=lynomi-staging ./deploy.sh",
-    "deploy:project": "REGION=asia-northeast1 PROJECT_ID=lynomi-208115 BUCKET_NAME=lynomi ./deploy.sh",
+    "deploy": "REGION=asia-northeast1 PROJECT_ID=<project id> BUCKET_NAME=<bucket name> ./deploy.sh",
     "format": "prettier --write --no-semi --single-quote index.js"
   },
   "dependencies": {
-    "@google-cloud/storage": "^2.3.1",
-    "imagemin": "^6.0.0",
+    "@google-cloud/storage": "^2.3.4",
+    "fs-extra": "^7.0.1",
+    "imagemin": "^6.1.0",
     "imagemin-mozjpeg": "^8.0.0",
-    "imagemin-pngquant": "^6.0.0",
-    "sharp": "^0.21.0"
-  },
-  "engines": {
-    "node": "8.x.x"
+    "imagemin-pngquant": "^6.0.1",
+    "sharp": "^0.21.1"
   },
   "devDependencies": {
     "prettier": "^1.15.2"
+  },
+  "engines": {
+    "node": "8.x.x"
   }
 }

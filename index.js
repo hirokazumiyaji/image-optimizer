@@ -1,3 +1,6 @@
+const os = require('os')
+const path = require('path')
+const fs = require('fs-extra')
 const { Storage } = require('@google-cloud/storage')
 const sharp = require('sharp')
 
@@ -17,62 +20,47 @@ exports.image_optimizer = async (req, res) => {
     return
   }
 
+  const dir = path.join(os.tmpdir(), 'workspace')
+  await fs.ensureDir(dir)
+
+  const name = req.path.split('/').pop()
+  const tempFile = path.join(dir, name)
+
   const file = storage.bucket(bucket).file(req.path.substring(1))
 
   const metadata = await file.getMetadata()
   const contentType = metadata[0].contentType
 
-  let inStream = file.createReadStream()
+  await file.download({ destination: tempFile })
 
-  inStream.on('error', err => {
-    console.error(err)
-    res.status(err.code).send({ message: err })
-  })
-
-  let outStream = await sharp(inStream)
+  let s = await sharp(tempFile)
   if (width && height) {
-    outStream = outStream
+    s = s
       .resize(width, height)
       .max()
       .withoutEnlargement()
   }
-  const buffer = await outStream.toBuffer()
-  res.set('Content-Type', contentType)
-  //let buffer = null
-  //if (accept.includes('image/webp')) {
-  //  if (quality) {
-  //    outStream = outStream.webp({ quality: quality })
-  //  } else {
-  //    outStream = outStream.webp()
-  //  }
-  //  try {
-  //    buffer = await outStream.toBuffer()
-  //  } catch (e) {
-  //    console.group('toBuffer webp')
-  //    console.log(e)
-  //    console.groupEnd()
-  //    throw e
-  //  }
-  //  res.set('Content-Type', 'image/webp')
-  //} else {
-  //  try {
-  //    buffer = await outStream.toBuffer()
-  //  } catch (e) {
-  //    console.group('toBuffer webp')
-  //    console.log(e)
-  //    console.groupEnd()
-  //    throw e
-  //  }
-  //  if (quality) {
-  //    buffer = await imagemin.buffer(buffer, {
-  //      plugins: [
-  //        imageminMozjpeg({ quality: quality }),
-  //        imageminPngquant({ quality: quality })
-  //      ]
-  //    })
-  //  }
-  //  res.set('Content-Type', contentType)
-  //}
+  let buffer = null
+  if (accept.includes('image/webp')) {
+    if (quality) {
+      s = s.webp({ quality: quality })
+    } else {
+      s = s.webp()
+    }
+    buffer = await s.toBuffer()
+    res.set('Content-Type', 'image/webp')
+  } else {
+    buffer = await s.toBuffer()
+    if (quality) {
+      buffer = await imagemin.buffer(buffer, {
+        plugins: [
+          imageminMozjpeg({ quality: quality }),
+          imageminPngquant({ quality: quality })
+        ]
+      })
+    }
+    res.set('Content-Type', contentType)
+  }
 
   res.set('Vary', 'Accept')
   res.set('Cache-Control', 'public, max-age=86400')
